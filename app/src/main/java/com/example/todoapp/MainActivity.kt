@@ -22,6 +22,7 @@ import com.google.android.material.appbar.MaterialToolbar
 import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
@@ -101,14 +102,37 @@ class MainActivity : AppCompatActivity() {
 
             override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
                 val position = viewHolder.adapterPosition
+                val task = list[position]
 
                 if (direction == ItemTouchHelper.LEFT) {
                     GlobalScope.launch(Dispatchers.IO) {
-                        db.todoDao().deleteTask(adapter.getItemId(position))
+                        // Delete from local database
+                        db.todoDao().deleteTask(task.id)
+
+                        // Delete from Firestore
+                        val firestore = FirebaseFirestore.getInstance()
+                        firestore.collection("tasks")
+                            .whereEqualTo("title", task.title)
+                            .whereEqualTo("description", task.description)
+                            .get()
+                            .addOnSuccessListener { documents ->
+                                for (document in documents) {
+                                    firestore.collection("tasks").document(document.id).delete()
+                                        .addOnSuccessListener {
+                                            println("Task successfully deleted from Firestore!")
+                                        }
+                                        .addOnFailureListener { e ->
+                                            println("Error deleting task from Firestore: $e")
+                                        }
+                                }
+                            }
+                            .addOnFailureListener { e ->
+                                println("Error finding task in Firestore: $e")
+                            }
                     }
                 } else if (direction == ItemTouchHelper.RIGHT) {
                     GlobalScope.launch(Dispatchers.IO) {
-                        db.todoDao().finishTask(adapter.getItemId(position))
+                        db.todoDao().finishTask(task.id)
                     }
                 }
             }
@@ -177,6 +201,7 @@ class MainActivity : AppCompatActivity() {
         val itemTouchHelper = ItemTouchHelper(simpleItemTouchCallback)
         itemTouchHelper.attachToRecyclerView(todoRv)
     }
+
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.main_menu, menu)
