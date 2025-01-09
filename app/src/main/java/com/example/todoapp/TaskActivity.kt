@@ -13,163 +13,170 @@ import android.widget.TimePicker
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 
 const val DB_NAME="todo.db"
-class  TaskActivity : AppCompatActivity(), View.OnClickListener {
+class TaskActivity : AppCompatActivity(), View.OnClickListener {
 
-
-    lateinit var myCalander:Calendar
-
-    lateinit var dateSetListener:DatePickerDialog.OnDateSetListener
+    lateinit var myCalendar: Calendar
+    lateinit var dateSetListener: DatePickerDialog.OnDateSetListener
     lateinit var timeSetListener: TimePickerDialog.OnTimeSetListener
 
-    var finalDate=0L
-    var finalTime=0L
+    private var selectedDate: String = ""
+    private var selectedTime: String = ""
 
-    private val labels= arrayListOf("Personal","Business","Insurance","Shopping","Banking")
+    private val labels = arrayListOf("Personal", "Business", "Insurance", "Shopping", "Banking")
     val db by lazy {
-             AppDatabase.getDatabase(this)
-     }
+        AppDatabase.getDatabase(this)
+    }
 
+    private val firestore = FirebaseFirestore.getInstance()
 
     override fun onCreate(savedInstanceState: Bundle?) {
-
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_task)
 
+        myCalendar = Calendar.getInstance() // Initialize calendar
+
         val saveBtn = findViewById<MaterialButton>(R.id.saveBtn)
-        saveBtn.setOnClickListener{
-            startActivity(Intent(this, MainActivity::class.java))
-        }
-
-
-            val dateEdt=findViewById<TextInputEditText>(R.id.dateEdt)
-        val timeEdt=findViewById<TextInputEditText>(R.id.timeEdt)
+        val dateEdt = findViewById<TextInputEditText>(R.id.dateEdt)
+        val timeEdt = findViewById<TextInputEditText>(R.id.timeEdt)
 
         dateEdt.setOnClickListener(this)
         timeEdt.setOnClickListener(this)
         saveBtn.setOnClickListener(this)
 
-
-        setUpSinner()
-
-
+        setUpSpinner()
     }
 
-
-    private fun setUpSinner() {
-      val adapter=ArrayAdapter<String>(this,android.R.layout.simple_spinner_dropdown_item,labels)
+    private fun setUpSpinner() {
+        val adapter = ArrayAdapter<String>(this, android.R.layout.simple_spinner_dropdown_item, labels)
         labels.sort()
-        val spinnerCategory=findViewById<Spinner>(R.id.spinnerCategory)
-
-        spinnerCategory.adapter=adapter
+        val spinnerCategory = findViewById<Spinner>(R.id.spinnerCategory)
+        spinnerCategory.adapter = adapter
     }
 
     override fun onClick(v: View) {
-        when(v.id){
-          R.id.dateEdt->{
-              SetListener()
+        when (v.id) {
+            R.id.dateEdt -> {
+                setListener()
             }
-            R.id.timeEdt->{
-                SetTimeListener()
+            R.id.timeEdt -> {
+                setTimeListener()
             }
             R.id.saveBtn -> {
                 saveTodo()
             }
         }
     }
+
     private fun saveTodo() {
-        val spinnerCategory=findViewById<Spinner>(R.id.spinnerCategory)
-        val taskInpLay=findViewById<TextInputLayout>(R.id.taskInpLay)
-        val titleInpLay=findViewById<TextInputLayout>(R.id.titleInpLay)
+        val spinnerCategory = findViewById<Spinner>(R.id.spinnerCategory)
+        val taskInpLay = findViewById<TextInputLayout>(R.id.taskInpLay)
+        val titleInpLay = findViewById<TextInputLayout>(R.id.titleInpLay)
+
         val category = spinnerCategory.selectedItem.toString()
         val title = titleInpLay.editText?.text.toString()
         val description = taskInpLay.editText?.text.toString()
 
+        val task = TodoModel(
+            title = title,
+            description = description,
+            category = category,
+            date = myCalendar.timeInMillis,  // Keep the milliseconds for the database
+            time = myCalendar.timeInMillis   // Keep the milliseconds for the database
+        )
 
         GlobalScope.launch(Dispatchers.Main) {
             val id = withContext(Dispatchers.IO) {
-                return@withContext db.todoDao().insertTask(
-                    TodoModel(
-                        title,
-                        description,
-                        category,
-                        finalDate,
-                        finalTime
-                    )
-                )
+                db.todoDao().insertTask(task)
             }
-            finish()
+            saveToFirestore(task, id)
         }
-
     }
 
-    private fun SetTimeListener() {
-        myCalander= Calendar.getInstance()
+    private fun saveToFirestore(task: TodoModel, localId: Long) {
+        val taskMap = hashMapOf(
+            "title" to task.title,
+            "description" to task.description,
+            "category" to task.category,
+            "date" to selectedDate,    // Store formatted date string
+            "time" to selectedTime,    // Store formatted time string // Store milliseconds for sorting/querying
+            "localId" to localId
+        )
 
-        timeSetListener= TimePickerDialog.OnTimeSetListener(){ _: TimePicker, hourOfDay: Int, min: Int,  ->
-            myCalander.set(Calendar.HOUR_OF_DAY,hourOfDay)
-            myCalander.set(Calendar.MINUTE,min)
+        firestore.collection("tasks")
+            .add(taskMap)
+            .addOnSuccessListener { documentReference ->
+                println("Task added to Firestore with ID: ${documentReference.id}")
+                finish()
+            }
+            .addOnFailureListener { e ->
+                println("Error adding task to Firestore: $e")
+                finish()
+            }
+    }
+
+    private fun setTimeListener() {
+        timeSetListener = TimePickerDialog.OnTimeSetListener { _: TimePicker, hourOfDay: Int, min: Int ->
+            myCalendar.set(Calendar.HOUR_OF_DAY, hourOfDay)
+            myCalendar.set(Calendar.MINUTE, min)
+            myCalendar.set(Calendar.SECOND, 0)
             updateTime()
         }
 
-        val timePickerDialog=TimePickerDialog(
+        val timePickerDialog = TimePickerDialog(
             this,
             timeSetListener,
-            myCalander.get(Calendar.HOUR_OF_DAY),
-            myCalander.get(Calendar.MINUTE),
-            false
+            myCalendar.get(Calendar.HOUR_OF_DAY),
+            myCalendar.get(Calendar.MINUTE),
+            true  // Changed to true for 24-hour format
         )
         timePickerDialog.show()
     }
 
     private fun updateTime() {
-        //Mon, 5 Jan 2020
-        val myFormat= "h:mm a"
-        val sdf=SimpleDateFormat(myFormat)
-        val timeEdt=findViewById<TextInputEditText>(R.id.timeEdt)
-
-        timeEdt.setText(sdf.format(myCalander.time))
-
-
+        val myFormat = "HH:mm:ss"  // 24-hour format with seconds
+        val sdf = SimpleDateFormat(myFormat, Locale.getDefault())
+        val timeEdt = findViewById<TextInputEditText>(R.id.timeEdt)
+        selectedTime = sdf.format(myCalendar.time)
+        timeEdt.setText(selectedTime)
     }
 
-    private fun SetListener() {
-        myCalander= Calendar.getInstance()
-
-        dateSetListener= DatePickerDialog.OnDateSetListener{ _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
-            myCalander.set(Calendar.YEAR,year)
-            myCalander.set(Calendar.MONTH,month)
-            myCalander.set(Calendar.DAY_OF_MONTH,dayOfMonth)
+    private fun setListener() {
+        dateSetListener = DatePickerDialog.OnDateSetListener { _: DatePicker, year: Int, month: Int, dayOfMonth: Int ->
+            myCalendar.set(Calendar.YEAR, year)
+            myCalendar.set(Calendar.MONTH, month)
+            myCalendar.set(Calendar.DAY_OF_MONTH, dayOfMonth)
             updateDate()
         }
 
-        val datePickerDialog=DatePickerDialog(
+        val datePickerDialog = DatePickerDialog(
             this,
             dateSetListener,
-            myCalander.get(Calendar.YEAR),
-            myCalander.get(Calendar.MONTH),
-            myCalander.get(Calendar.DAY_OF_MONTH)
+            myCalendar.get(Calendar.YEAR),
+            myCalendar.get(Calendar.MONTH),
+            myCalendar.get(Calendar.DAY_OF_MONTH)
         )
-        datePickerDialog.datePicker.minDate=System.currentTimeMillis()
+        datePickerDialog.datePicker.minDate = System.currentTimeMillis()
         datePickerDialog.show()
     }
 
     private fun updateDate() {
-        //Mon, 5 Jan 2020
-        val myFormat= "EEE, d MMM yyyy"
-        val sdf=SimpleDateFormat(myFormat)
-        val dateEdt=findViewById<TextInputEditText>(R.id.dateEdt)
+        val myFormat = "yyyy-MM-dd"  // Changed to requested format
+        val sdf = SimpleDateFormat(myFormat, Locale.getDefault())
+        val dateEdt = findViewById<TextInputEditText>(R.id.dateEdt)
+        selectedDate = sdf.format(myCalendar.time)
+        dateEdt.setText(selectedDate)
 
-        dateEdt.setText(sdf.format(myCalander.time))
-
-        val timeInptlay=findViewById<TextInputLayout>(R.id.timeInpLay)
-        timeInptlay.visibility= View.VISIBLE
+        val timeInptlay = findViewById<TextInputLayout>(R.id.timeInpLay)
+        timeInptlay.visibility = View.VISIBLE
     }
 }

@@ -18,7 +18,7 @@
         app:title="New Task"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:background="#4CAF50"
+        android:background="@color/colorPrimary"
         app:popupTheme="@style/TextAppearance.AppCompat.Caption"/>
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -31,7 +31,8 @@
         android:layout_marginBottom="4dp"
         android:text="Task Title"
         android:textColor="#FF5722"
-        android:textSize="16sp"/>
+        android:textStyle="bold"
+        android:textSize="19sp"/>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
@@ -61,7 +62,8 @@
         android:layout_marginBottom="4dp"
         android:text="What is to be done?"
         android:textColor="#FF5722"
-        android:textSize="16sp"/>
+        android:textStyle="bold"
+        android:textSize="19sp"/>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
@@ -92,7 +94,8 @@
         android:layout_marginBottom="4dp"
         android:text="Set remainder date and time"
         android:textColor="#FF5722"
-        android:textSize="16sp"/>
+        android:textStyle="bold"
+        android:textSize="19sp"/>
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
@@ -101,7 +104,8 @@
         app:hintTextColor="#FF5722"
         app:boxStrokeColor="#FF5722"
         android:layout_marginEnd="16dp"
-        android:layout_marginBottom="16dp">
+        android:layout_marginBottom="16dp"
+        android:id="@+id/dateinput">
 
         <com.google.android.material.textfield.TextInputEditText
             android:layout_width="match_parent"
@@ -112,7 +116,6 @@
             android:cursorVisible="false"
             android:drawablePadding="8dp"
             android:drawableEnd="@drawable/ic_date_range_black_24dp"
-            android:drawableTint="#FF5722"
             android:focusable="false"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
@@ -140,7 +143,6 @@
             android:cursorVisible="false"
             android:drawablePadding="8dp"
             android:drawableEnd="@drawable/ic_access_time_black"
-            android:drawableTint="#FF5722"
             android:focusable="false"
             android:paddingStart="8dp"
             android:paddingEnd="8dp"
@@ -170,13 +172,15 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:src="@drawable/baseline_playlist_add_24"
-            app:tint="#FF5722" />
+            />
 
     </LinearLayout>
     <com.google.android.material.button.MaterialButton
         android:text="Save Task"
+        android:textStyle="bold"
+        android:textAllCaps="true"
         android:id="@+id/saveBtn"
-        android:backgroundTint="#FF5722"
+        android:backgroundTint="@color/yellow"
         android:layout_marginTop="32dp"
         android:layout_marginEnd="16dp"
         android:layout_gravity="end"
